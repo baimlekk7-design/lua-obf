@@ -1,8 +1,10 @@
 from http.server import BaseHTTPRequestHandler
 import json, base64, subprocess, tempfile, os, shutil
 
-BIN_SRC = os.path.join(os.path.dirname(__file__), 'luajit')
+HERE = os.path.dirname(__file__)
+BIN_SRC = os.path.join(HERE, 'luajit')
 BIN_TMP = '/tmp/luajit_runtime'
+JIT_DIR = os.path.join(HERE, 'jit')
 
 def ensure_bin():
     if os.path.exists(BIN_TMP) and os.access(BIN_TMP, os.X_OK):
@@ -36,6 +38,10 @@ class handler(BaseHTTPRequestHandler):
             if not bin_path:
                 return self._j({'ok': False, 'error': 'binary luajit gak ketemu'})
 
+            env = os.environ.copy()
+            env['LUA_PATH'] = (os.path.join(JIT_DIR, '?.lua') + ';' +
+                               os.path.join(JIT_DIR, '?', 'init.lua') + ';;')
+
             with tempfile.TemporaryDirectory() as td:
                 src = os.path.join(td, 'in.lua')
                 out = os.path.join(td, 'out.luac')
@@ -46,7 +52,7 @@ class handler(BaseHTTPRequestHandler):
                 if strip: cmd.append('-s')
                 cmd += [src, out]
 
-                r = subprocess.run(cmd, capture_output=True, timeout=8)
+                r = subprocess.run(cmd, capture_output=True, timeout=8, env=env)
                 if r.returncode != 0:
                     err = (r.stderr or b'').decode('utf-8', 'replace') or 'luajit gagal'
                     return self._j({'ok': False, 'error': err.strip()})
