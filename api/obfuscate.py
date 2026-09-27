@@ -1,7 +1,21 @@
 from http.server import BaseHTTPRequestHandler
-import json, base64, subprocess, tempfile, os
+import json, base64, subprocess, tempfile, os, shutil
 
-BIN = os.path.join(os.path.dirname(__file__), 'luajit')
+BIN_SRC = os.path.join(os.path.dirname(__file__), 'luajit')
+BIN_TMP = '/tmp/luajit_runtime'
+
+def ensure_bin():
+    if os.path.exists(BIN_TMP) and os.access(BIN_TMP, os.X_OK):
+        return BIN_TMP
+    if not os.path.exists(BIN_SRC):
+        return None
+    try:
+        shutil.copy2(BIN_SRC, BIN_TMP)
+        os.chmod(BIN_TMP, 0o755)
+    except Exception:
+        return None
+    return BIN_TMP
+
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
@@ -18,8 +32,9 @@ class handler(BaseHTTPRequestHandler):
             if not code.strip():
                 return self._j({'ok': False, 'error': 'kode kosong'})
 
-            if not os.path.exists(BIN):
-                return self._j({'ok': False, 'error': 'binary luajit belum ada, tunggu action selesai'})
+            bin_path = ensure_bin()
+            if not bin_path:
+                return self._j({'ok': False, 'error': 'binary luajit gak ketemu'})
 
             with tempfile.TemporaryDirectory() as td:
                 src = os.path.join(td, 'in.lua')
@@ -27,8 +42,7 @@ class handler(BaseHTTPRequestHandler):
                 with open(src, 'w', encoding='utf-8', errors='replace') as f:
                     f.write(code)
 
-                os.chmod(BIN, 0o755)
-                cmd = [BIN, "-b"]
+                cmd = [bin_path, '-b']
                 if strip: cmd.append('-s')
                 cmd += [src, out]
 
