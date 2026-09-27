@@ -27,7 +27,8 @@ class handler(BaseHTTPRequestHandler):
                 with open(src, 'w', encoding='utf-8', errors='replace') as f:
                     f.write(code)
 
-                cmd = [BIN, '-b']
+                os.chmod(BIN, 0o755)
+                cmd = [BIN, "-b"]
                 if strip: cmd.append('-s')
                 cmd += [src, out]
 
